@@ -1,7 +1,7 @@
 # Guía para el equipo — Identificador de Sabores de Comida
 
-Repositorio: **(pendiente — pégalo aquí cuando se cree)**
-Notebook de Colab: **(pendiente — pégalo aquí cuando se cree)**
+Repositorio: **https://github.com/Gad-gg-23/Identificador-Sabores-Comida**
+Notebook de Colab: **https://colab.research.google.com/github/Gad-gg-23/Identificador-Sabores-Comida/blob/main/colab/Comida_Colab.ipynb**
 
 ---
 
