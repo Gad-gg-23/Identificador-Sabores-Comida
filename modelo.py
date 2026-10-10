@@ -1,8 +1,8 @@
 """
 Modelo: transfer learning con MobileNetV2 preentrenada en ImageNet.
 
-Mismo criterio que Frutas_Verduras/modelo.py: se congela el backbone y
-solo se entrena una cabeza nueva. La diferencia es que aquí la cabeza
+Se congela el backbone (las capas convolucionales que ya saben extraer
+bordes/texturas/formas) y solo se entrena una cabeza nueva. La cabeza
 tiene 5 salidas (una por sabor) SIN softmax -- cada salida es independiente
 (sigmoid implícito en BCEWithLogitsLoss durante el entrenamiento, y
 explícito en predecir.py), porque un platillo puede ser dulce Y picoso Y

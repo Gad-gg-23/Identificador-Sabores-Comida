@@ -18,9 +18,8 @@ fotos propias, reentrenar), ver [GUIA_EQUIPO.md](GUIA_EQUIPO.md).
 
 ## Por qué multi-etiqueta y no un clasificador normal
 
-Un clasificador "normal" (como el de [Frutas_Verduras](../Frutas_Verduras))
-elige **una** clase de varias posibles (softmax: las probabilidades suman 1).
-Aquí cada sabor es una decisión independiente (sigmoid por salida,
+Un clasificador "normal" elige **una** clase de varias posibles (softmax:
+las probabilidades suman 1). Aquí cada sabor es una decisión independiente (sigmoid por salida,
 entrenado con `BCEWithLogitsLoss`): el modelo puede decir "sí" a varios
 sabores a la vez, porque así es la comida real.
 

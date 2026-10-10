@@ -1,7 +1,9 @@
 # Guía para el equipo — Identificador de Sabores de Comida
 
-Repositorio: **https://github.com/Gad-gg-23/Identificador-Sabores-Comida**
-Notebook de Colab: **https://colab.research.google.com/github/Gad-gg-23/Identificador-Sabores-Comida/blob/main/colab/Comida_Colab.ipynb**
+Repositorio: **[github.com/Gad-gg-23/Identificador-Sabores-Comida](https://github.com/Gad-gg-23/Identificador-Sabores-Comida)**
+
+Notebook de Colab (ábrelo directo con este link, no hace falta buscarlo):
+**[colab.research.google.com/.../Comida_Colab.ipynb](https://colab.research.google.com/github/Gad-gg-23/Identificador-Sabores-Comida/blob/main/colab/Comida_Colab.ipynb)**
 
 ---
 
@@ -17,7 +19,7 @@ Nadie más necesita hacer este paso. El resto de la guía es para **cada compañ
 
 ## Parte 1 — La primera vez que abres el notebook (cada persona, una sola vez)
 
-A diferencia de la práctica de Frutas/Verduras, **aquí no se necesita cuenta de Kaggle ni token**: el dataset (Food-101) se descarga directo desde su fuente oficial con una sola línea, `torchvision` ya sabe hacerlo.
+**No se necesita cuenta de Kaggle ni token de ningún tipo**: el dataset (Food-101) se descarga directo desde su fuente oficial con una sola línea, `torchvision` ya sabe hacerlo solo.
 
 ### 1.1 Abrir el notebook
 
@@ -39,7 +41,7 @@ Lo que vas a ver pasar, en orden:
 3. **Fotos desde Drive** — déjala tal cual (`USAR_DRIVE = False`), no la necesitas.
 4. **Descarga Food-101 y entrena** — tiene DOS celdas:
    - La primera descarga Food-101 (**pesa ~5 GB — la primera vez tarda varios minutos**, vas a ver progreso). Las siguientes veces es más rápido porque ya queda en caché mientras la sesión siga abierta.
-   - La segunda es la que **entrena de verdad**: va a imprimir el progreso época por época. Tarda varios minutos más (son ~100,000 imágenes, más que en Frutas/Verduras). **Espera a que termine por completo** — al final debe decir `Modelo final en '.../salidas/modelo_comida.pt'`. Si avanzas a la siguiente celda antes de que termine, te va a salir un error de "archivo no encontrado".
+   - La segunda es la que **entrena de verdad**: va a imprimir el progreso época por época. Tarda varios minutos más (son ~100,000 imágenes). **Espera a que termine por completo** — al final debe decir `Modelo final en '.../salidas/modelo_comida.pt'`. Si avanzas a la siguiente celda antes de que termine, te va a salir un error de "archivo no encontrado".
 5. **Ver resultados** — te muestra Accuracy exacta, F1 por ejemplo, F1 por sabor, la tabla de métricas por sabor, y las 5 matrices de confusión (una por sabor).
 6. **Descargar o subir el modelo** (opcional) — ver Parte 4.
 7. **Probar con tu propia foto** (opcional) — ver Parte 5.
@@ -48,7 +50,7 @@ Lo que vas a ver pasar, en orden:
 
 ## Parte 2 — Cómo subir fotos con su sabor (en cualquier momento, SIN necesidad de Colab)
 
-Esto se hace desde el navegador, directo en GitHub — no toques Colab para este paso. A diferencia de Frutas/Verduras (donde bastaba con arrastrar la foto a una carpeta), aquí **cada foto necesita que alguien diga explícitamente qué sabores tiene**, porque eso no se puede adivinar solo del nombre del platillo.
+Esto se hace desde el navegador, directo en GitHub — no toques Colab para este paso. **Cada foto necesita que alguien diga explícitamente qué sabores tiene** (no basta con solo subirla a una carpeta), porque el sabor no se puede adivinar solo del nombre del platillo.
 
 1. Entra al repo en GitHub, navega a `data/fotos_propias/imagenes/`.
 2. Botón **Add file → Upload files** → arrastra tus fotos (jpg o png) → **Commit changes**.

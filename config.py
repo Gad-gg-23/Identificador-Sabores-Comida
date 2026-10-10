@@ -1,14 +1,14 @@
 """
 Configuración central del identificador de sabores de comida.
 
-Igual que en Frutas_Verduras/config.py: un solo lugar con rutas,
-hiperparámetros y la tabla de mapeo clase-de-platillo -> sabores, para que
-entrenar.py, dataset.py y predecir.py no se desincronicen.
+Un solo lugar con rutas, hiperparámetros y la tabla de mapeo
+clase-de-platillo -> sabores, para que entrenar.py, dataset.py y
+predecir.py no se desincronicen.
 
-A diferencia de Frutas_Verduras (binario: fruta o verdura), aquí cada
-platillo puede tener VARIOS sabores a la vez (multi-etiqueta): el mole
-puede ser dulce + picoso + amargo al mismo tiempo. El modelo no elige una
-sola clase, decide sí/no para cada uno de los 5 sabores por separado.
+Esto es multi-etiqueta, no clasificación normal: cada platillo puede tener
+VARIOS sabores a la vez (el mole puede ser dulce + picoso + amargo al
+mismo tiempo). El modelo no elige una sola clase, decide sí/no para cada
+uno de los 5 sabores por separado.
 """
 
 import os
@@ -27,8 +27,8 @@ RUTA_IMAGENES_PROPIAS = RUTA_FOTOS_PROPIAS / "imagenes"
 RUTA_ETIQUETAS_PROPIAS_CSV = RUTA_FOTOS_PROPIAS / "etiquetas.csv"
 
 # Food-101 NO se guarda dentro del proyecto: torchvision lo descarga a su
-# propia carpeta de caché (fuera del repo), igual que kagglehub en
-# Frutas_Verduras. Pesa ~5 GB comprimido / ~10 GB ya extraído.
+# propia carpeta de caché (fuera del repo). Pesa ~5 GB comprimido / ~10 GB
+# ya extraído.
 RUTA_CACHE_FOOD101 = Path.home() / ".cache" / "comida_food101"
 
 RUTA_SALIDAS = RAIZ / "salidas"
@@ -202,10 +202,9 @@ UMBRAL_DECISION = 0.5         # probabilidad mínima para marcar un sabor como p
 FRACCION_VALIDACION = 0.1
 
 # Fracción de las fotos propias que se reserva como prueba "de ruido real"
-# (el resto se mezcla al entrenamiento). A diferencia de Frutas_Verduras,
-# aquí NO se estratifica (cada foto puede tener varios sabores a la vez,
-# estratificar multi-etiqueta necesitaría una librería aparte) — se reparte
-# aleatoriamente nomás.
+# (el resto se mezcla al entrenamiento). NO se estratifica (cada foto
+# puede tener varios sabores a la vez, estratificar multi-etiqueta
+# necesitaría una librería aparte) — se reparte aleatoriamente nomás.
 FRACCION_PRUEBA_FOTOS_PROPIAS = 0.2
 
 DISPOSITIVO = torch.device("cuda" if torch.cuda.is_available() else "cpu")

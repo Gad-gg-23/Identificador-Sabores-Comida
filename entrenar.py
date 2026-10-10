@@ -1,8 +1,7 @@
 """
 Entrenamiento del identificador multi-etiqueta de sabores.
 
-Flujo (mismo espíritu que Frutas_Verduras/entrenar.py, adaptado a
-multi-etiqueta):
+Flujo:
   1) Construir los splits train/val/test (dataset.construir_splits)
   2) Preparar los DataLoaders con augmentation en train
   3) Crear el modelo (transfer learning, modelo.crear_modelo)
