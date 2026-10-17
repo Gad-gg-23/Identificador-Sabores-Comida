@@ -5,13 +5,15 @@ Flujo:
   1) Construir los splits train/val/test (dataset.construir_splits)
   2) Preparar los DataLoaders con augmentation en train
   3) Crear el modelo (transfer learning, modelo.crear_modelo)
-  4) Entrenar con BCEWithLogitsLoss (no CrossEntropy: cada sabor es un
-     sí/no independiente) y early stopping sobre F1 "por ejemplo" de val
-  5) Evaluar en test: Accuracy exacta, F1 macro/por-ejemplo, métricas por
+  4) Entrenar con BCEWithLogitsLoss balanceada (no CrossEntropy: cada sabor
+     es un sí/no independiente) y early stopping sobre F1 "por ejemplo" de val
+  5) Calibrar un umbral por sabor exclusivamente sobre validación
+  6) Evaluar en test: Accuracy exacta, F1 macro/por-ejemplo, métricas por
      sabor, y una matriz de confusión por cada sabor
-  6) Guardar modelo, histórico de entrenamiento y métricas
+  7) Guardar modelo, balance, umbrales, histórico y métricas
 """
 
+import json
 import time
 
 import matplotlib.pyplot as plt
@@ -28,6 +30,7 @@ from sklearn.metrics import (
 from torch.utils.data import DataLoader
 
 import config
+import balanceo
 import dataset
 import modelo as modelo_mod
 
@@ -54,16 +57,25 @@ def _crear_dataloaders():
         ds_test, batch_size=config.BATCH_SIZE, shuffle=False,
         num_workers=config.NUM_WORKERS, pin_memory=config.PIN_MEMORY, persistent_workers=config.NUM_WORKERS > 0,
     )
-    return dl_train, dl_val, dl_test
+    pos_weight, reporte_balance = balanceo.estadisticas_y_pos_weight(
+        splits["train"], config.ETIQUETAS
+    )
+    return dl_train, dl_val, dl_test, pos_weight, reporte_balance
 
 
-def _correr_epoca(modelo, dataloader, criterio, optimizador=None):
+def _correr_epoca(modelo, dataloader, criterio, optimizador=None, umbrales=None):
     """Una pasada completa. Si optimizador es None, es modo evaluación (sin backprop)."""
     entrenando = optimizador is not None
     modelo.train() if entrenando else modelo.eval()
 
     perdida_total = 0.0
-    y_true, y_pred = [], []
+    y_true, y_pred, y_prob = [], [], []
+    vector_umbrales = balanceo.vector_umbrales(
+        umbrales, config.ETIQUETAS, config.UMBRAL_DECISION
+    )
+    tensor_umbrales = torch.tensor(
+        vector_umbrales, dtype=torch.float32, device=config.DISPOSITIVO
+    ).unsqueeze(0)
 
     contexto = torch.enable_grad() if entrenando else torch.no_grad()
     with contexto:
@@ -83,13 +95,15 @@ def _correr_epoca(modelo, dataloader, criterio, optimizador=None):
 
             perdida_total += perdida.item() * imagenes.size(0)
             probabilidades = torch.sigmoid(salidas)
-            predicciones = (probabilidades >= config.UMBRAL_DECISION).int()
+            predicciones = (probabilidades >= tensor_umbrales).int()
             y_pred.extend(predicciones.cpu().tolist())
             y_true.extend(etiquetas.int().cpu().tolist())
+            y_prob.extend(probabilidades.cpu().tolist())
 
     n = len(y_true)
     y_true_arr = np.array(y_true)
     y_pred_arr = np.array(y_pred)
+    y_prob_arr = np.array(y_prob)
     metricas = {
         "perdida": perdida_total / n,
         # Accuracy "exacta": las 5 etiquetas deben coincidir perfectamente.
@@ -104,18 +118,27 @@ def _correr_epoca(modelo, dataloader, criterio, optimizador=None):
         # por frecuencia -- si el modelo ignora "amarga" (poco común) se nota.
         "f1_macro": f1_score(y_true_arr, y_pred_arr, average="macro", zero_division=0),
     }
-    return metricas, y_true_arr, y_pred_arr
+    return metricas, y_true_arr, y_pred_arr, y_prob_arr
 
 
 def entrenar():
     config.RUTA_SALIDAS.mkdir(parents=True, exist_ok=True)
 
-    print("Construyendo splits (Food-101 + fotos propias)...")
-    dl_train, dl_val, dl_test = _crear_dataloaders()
+    print("Construyendo splits (Food-101 + fotos propias + FoodSense curado)...")
+    dl_train, dl_val, dl_test, pos_weight, reporte_balance = _crear_dataloaders()
+    config.RUTA_BALANCE_JSON.write_text(
+        json.dumps(reporte_balance, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print("\nBalance calculado solamente con train:")
+    for etiqueta in config.ETIQUETAS:
+        positivos = reporte_balance["positivos"][etiqueta]
+        peso = reporte_balance["pos_weight"][etiqueta]
+        print(f"  {etiqueta}: {positivos} positivos, pos_weight={peso:.3f}")
 
     print(f"\nDispositivo: {config.DISPOSITIVO}")
     modelo = modelo_mod.crear_modelo()
-    criterio = nn.BCEWithLogitsLoss()
+    criterio = nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(config.DISPOSITIVO))
     optimizador = torch.optim.Adam(
         filter(lambda p: p.requires_grad, modelo.parameters()),
         lr=config.TASA_APRENDIZAJE,
@@ -129,8 +152,24 @@ def entrenar():
     for epoca in range(1, config.NUM_EPOCAS + 1):
         inicio = time.time()
 
-        metricas_train, _, _ = _correr_epoca(modelo, dl_train, criterio, optimizador)
-        metricas_val, _, _ = _correr_epoca(modelo, dl_val, criterio)
+        metricas_train, _, _, _ = _correr_epoca(modelo, dl_train, criterio, optimizador)
+        metricas_val, y_val, _, y_prob_val = _correr_epoca(modelo, dl_val, criterio)
+        umbrales_epoca = balanceo.optimizar_umbrales(
+            y_val, y_prob_val, config.ETIQUETAS
+        )
+        pred_val_calibrada = (
+            y_prob_val
+            >= balanceo.vector_umbrales(
+                umbrales_epoca, config.ETIQUETAS, config.UMBRAL_DECISION
+            )
+        ).astype(int)
+        metricas_val["accuracy_exacta"] = accuracy_score(y_val, pred_val_calibrada)
+        metricas_val["f1_muestras"] = f1_score(
+            y_val, pred_val_calibrada, average="samples", zero_division=0
+        )
+        metricas_val["f1_macro"] = f1_score(
+            y_val, pred_val_calibrada, average="macro", zero_division=0
+        )
 
         duracion = time.time() - inicio
         print(
@@ -168,7 +207,27 @@ def entrenar():
     # --- Evaluación final en test, con el MEJOR modelo (no el último) ---
     print("\nCargando mejor checkpoint para evaluar en test...")
     modelo.load_state_dict(torch.load(config.RUTA_MODELO, map_location=config.DISPOSITIVO))
-    metricas_test, y_true, y_pred = _correr_epoca(modelo, dl_test, criterio)
+
+    # ``pos_weight`` corrige el aprendizaje, pero desplaza las probabilidades.
+    # Por eso cada umbral se calibra con validación y solo después se toca test.
+    _, y_val, _, y_prob_val = _correr_epoca(modelo, dl_val, criterio)
+    umbrales = balanceo.optimizar_umbrales(y_val, y_prob_val, config.ETIQUETAS)
+    reporte_umbrales = {
+        "metodo": "umbral por sabor que maximiza F1 en validation",
+        "split_calibracion": "validation",
+        "umbrales": umbrales,
+    }
+    config.RUTA_UMBRALES_JSON.write_text(
+        json.dumps(reporte_umbrales, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print("Umbrales calibrados: " + ", ".join(
+        f"{etiqueta}={umbrales[etiqueta]:.3f}" for etiqueta in config.ETIQUETAS
+    ))
+
+    metricas_test, y_true, y_pred, _ = _correr_epoca(
+        modelo, dl_test, criterio, umbrales=umbrales
+    )
 
     resultados = {
         "Accuracy_exacta": metricas_test["accuracy_exacta"],

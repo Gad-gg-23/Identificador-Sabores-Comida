@@ -1,5 +1,5 @@
 """
-Construcción del dataset multi-etiqueta de sabores a partir de dos fuentes:
+Construcción del dataset multi-etiqueta de sabores a partir de tres fuentes:
 
 1. Food-101 (101 categorías de platillos, descargado por torchvision,
    SIN necesitar cuenta de Kaggle) -> cada imagen se re-etiqueta con el
@@ -10,6 +10,10 @@ Construcción del dataset multi-etiqueta de sabores a partir de dos fuentes:
    pidió el profesor (platillos reales, fondos distintos, luz distinta),
    etiquetadas A MANO por sabor en etiquetas.csv (aquí sí hay alguien
    diciendo "esto sabe a X", no se infiere del nombre del platillo).
+3. data/foodsense_curado/ -> subconjunto de FoodSense con descriptores de
+   sabor proporcionados por varios anotadores humanos y agregados por consenso.
+   Conserva los splits oficiales por imagen; el entrenamiento pondera después
+   cada sabor según su frecuencia real en train.
 
 El resultado son 3 listas de (ruta_imagen, vector_multihot): train / val /
 test, listas para envolver en ImagenesComida (Dataset de PyTorch).
@@ -25,6 +29,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 import config
+import foodsense
 
 EXTENSIONES_VALIDAS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
@@ -96,6 +101,33 @@ def indexar_fotos_propias() -> list[tuple[Path, list[int]]]:
     return indice
 
 
+def indexar_foodsense_curado() -> dict[str, list[tuple[Path, list[int]]]]:
+    """Carga el manifiesto FoodSense respetando su split oficial por imagen."""
+    foodsense.asegurar_preparado(config.RUTA_FOODSENSE, workers=config.NUM_WORKERS)
+    splits = {"train": [], "validation": [], "test": []}
+
+    with open(config.RUTA_ETIQUETAS_FOODSENSE_CSV, newline="", encoding="utf-8-sig") as archivo:
+        for numero_fila, fila in enumerate(csv.DictReader(archivo), start=2):
+            nombre = fila.get("archivo", "").strip()
+            split = fila.get("split", "").strip()
+            if split not in splits:
+                raise ValueError(
+                    f"Split FoodSense inválido en fila {numero_fila}: {split!r}. "
+                    "Debe ser train, validation o test."
+                )
+            ruta = config.RUTA_IMAGENES_FOODSENSE / nombre
+            if not ruta.exists():
+                raise FileNotFoundError(f"Falta la imagen FoodSense declarada en el manifiesto: {ruta}")
+            try:
+                vector = [int(fila[etiqueta]) for etiqueta in config.ETIQUETAS]
+            except (KeyError, ValueError) as error:
+                raise ValueError(f"Etiquetas FoodSense inválidas en fila {numero_fila}.") from error
+            if any(valor not in (0, 1) for valor in vector) or not any(vector):
+                raise ValueError(f"Vector FoodSense inválido en fila {numero_fila}: {vector}")
+            splits[split].append((ruta, vector))
+    return splits
+
+
 def _listar_imagenes(carpeta: Path) -> list[Path]:
     if not carpeta.exists():
         return []
@@ -114,8 +146,9 @@ def construir_splits() -> dict[str, list[tuple[Path, list[int]]]]:
       por NOMBRE DE PLATILLO (no por sabor: con multi-etiqueta no hay una
       sola clase para estratificar).
     - Las fotos propias (ruido real del equipo, etiquetadas a mano) se
-      reparten aparte, sin estratificar, para medir específicamente qué
-      tan bien generaliza al ruido real.
+      reparten aparte y sin estratificar. El holdout contiene fotos nuevas de
+      platillos que también pueden aparecer en train; no mide platillos inéditos.
+    - FoodSense conserva su train/validation/test oficial a nivel de imagen.
     """
     print("Descargando/verificando Food-101 (train)...")
     train_food101 = _cargar_split_food101("train")
@@ -149,8 +182,21 @@ def construir_splits() -> dict[str, list[tuple[Path, list[int]]]]:
               f"({len(train_fp)} a train, {len(test_fp)} a test).")
     else:
         print("Aviso: no hay fotos propias etiquetadas en data/fotos_propias/ todavía. "
-              "Se entrena solo con Food-101 (menos robusto al ruido real y a los sabores "
-              "propios de la comida mexicana, poco representada en Food-101).")
+              "Se usarán Food-101 y FoodSense, pero faltará el ruido real y la cobertura "
+              "de comida mexicana que aportan las fotos del equipo.")
+
+    # FoodSense es un complemento permanente, curado por consenso humano. Sus
+    # splits vienen definidos a nivel de imagen y nunca se vuelven a repartir.
+    complemento = indexar_foodsense_curado()
+    equivalencia_split = {"train": "train", "validation": "val", "test": "test"}
+    for split_origen, split_destino in equivalencia_split.items():
+        splits[split_destino].extend(complemento[split_origen])
+    print(
+        "FoodSense curado incorporado: "
+        f"{len(complemento['train'])} train, "
+        f"{len(complemento['validation'])} val, "
+        f"{len(complemento['test'])} test."
+    )
 
     for clave, lista in splits.items():
         random.Random(config.RANDOM_STATE).shuffle(lista)

@@ -1,0 +1,37 @@
+{
+  "fuente": "sababishraq/foodsense-dataset",
+  "revision": "843b1ae42b18deddfb4452362ae1a06202ade1cb",
+  "licencia": "CC BY 4.0",
+  "modo": "completo",
+  "min_votos": 3,
+  "min_fraccion": 0.12,
+  "candidatos_con_consenso": 1711,
+  "imagenes_seleccionadas": 1711,
+  "imagenes_descartadas": 0,
+  "conteos_existentes": {
+    "acida": 564,
+    "amarga": 36,
+    "dulce": 372,
+    "picosa": 672,
+    "salada": 1698
+  },
+  "deficit_inicial": {
+    "acida": 0,
+    "amarga": 0,
+    "dulce": 0,
+    "picosa": 0,
+    "salada": 0
+  },
+  "conteos_agregados": {
+    "acida": 135,
+    "amarga": 4,
+    "dulce": 690,
+    "picosa": 422,
+    "salada": 683
+  },
+  "conteos_por_split": {
+    "test": 248,
+    "validation": 173,
+    "train": 1290
+  }
+}

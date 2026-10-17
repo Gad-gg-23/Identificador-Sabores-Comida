@@ -7,11 +7,13 @@ entrenado. Uso:
 """
 
 import argparse
+import json
 from pathlib import Path
 
 import torch
 from PIL import Image
 
+import balanceo
 import config
 import dataset
 import modelo as modelo_mod
@@ -24,13 +26,29 @@ def cargar_modelo() -> torch.nn.Module:
         raise FileNotFoundError(
             f"No se encontró '{config.RUTA_MODELO}'. Corre primero 'python Comida.py entrenar'."
         )
-    modelo = modelo_mod.crear_modelo()
+    # El checkpoint contiene también el backbone; no hace falta volver a
+    # descargar los pesos ImageNet para realizar inferencia.
+    modelo = modelo_mod.crear_modelo(preentrenado=False)
     modelo.load_state_dict(torch.load(config.RUTA_MODELO, map_location=config.DISPOSITIVO))
     modelo.eval()
     return modelo
 
 
-def predecir_imagen(modelo: torch.nn.Module, ruta_imagen: Path) -> dict:
+def cargar_umbrales() -> dict[str, float]:
+    """Carga la calibración del entrenamiento o conserva compatibilidad anterior."""
+    if not config.RUTA_UMBRALES_JSON.exists():
+        return {etiqueta: config.UMBRAL_DECISION for etiqueta in config.ETIQUETAS}
+    contenido = json.loads(config.RUTA_UMBRALES_JSON.read_text(encoding="utf-8"))
+    umbrales = contenido.get("umbrales", contenido)
+    vector = balanceo.vector_umbrales(umbrales, config.ETIQUETAS, config.UMBRAL_DECISION)
+    return {etiqueta: float(vector[i]) for i, etiqueta in enumerate(config.ETIQUETAS)}
+
+
+def predecir_imagen(
+    modelo: torch.nn.Module,
+    ruta_imagen: Path,
+    umbrales: dict[str, float] | None = None,
+) -> dict:
     transform = dataset.transform_evaluacion()
     imagen = Image.open(ruta_imagen).convert("RGB")
     tensor = transform(imagen).unsqueeze(0).to(config.DISPOSITIVO)
@@ -42,8 +60,9 @@ def predecir_imagen(modelo: torch.nn.Module, ruta_imagen: Path) -> dict:
     probs_por_etiqueta = {
         etiqueta: float(probabilidades[i]) for i, etiqueta in enumerate(config.ETIQUETAS)
     }
+    umbrales = umbrales or cargar_umbrales()
     etiquetas_predichas = [
-        etiqueta for etiqueta, prob in probs_por_etiqueta.items() if prob >= config.UMBRAL_DECISION
+        etiqueta for etiqueta, prob in probs_por_etiqueta.items() if prob >= umbrales[etiqueta]
     ]
     if not etiquetas_predichas:
         # Todo plato tiene algún sabor dominante: si ninguno cruza el umbral,
@@ -54,6 +73,7 @@ def predecir_imagen(modelo: torch.nn.Module, ruta_imagen: Path) -> dict:
         "archivo": ruta_imagen.name,
         "etiquetas": etiquetas_predichas,
         "probabilidades": probs_por_etiqueta,
+        "umbrales": umbrales,
     }
 
 
@@ -65,6 +85,7 @@ def main():
     args = parser.parse_args()
 
     modelo = cargar_modelo()
+    umbrales = cargar_umbrales()
 
     if args.imagen:
         rutas = [Path(args.imagen)]
@@ -76,7 +97,7 @@ def main():
             return
 
     for ruta in rutas:
-        resultado = predecir_imagen(modelo, ruta)
+        resultado = predecir_imagen(modelo, ruta, umbrales)
         probs_texto = ", ".join(
             f"{etiqueta}={prob:.3f}" for etiqueta, prob in resultado["probabilidades"].items()
         )

@@ -26,6 +26,12 @@ RUTA_FOTOS_PROPIAS = RUTA_DATOS / "fotos_propias"  # fotos tomadas por el equipo
 RUTA_IMAGENES_PROPIAS = RUTA_FOTOS_PROPIAS / "imagenes"
 RUTA_ETIQUETAS_PROPIAS_CSV = RUTA_FOTOS_PROPIAS / "etiquetas.csv"
 
+# Complemento externo curado con consenso humano. El manifiesto se guarda en
+# Git; las imágenes se descargan de FoodSense cuando hacen falta.
+RUTA_FOODSENSE = RUTA_DATOS / "foodsense_curado"
+RUTA_IMAGENES_FOODSENSE = RUTA_FOODSENSE / "imagenes"
+RUTA_ETIQUETAS_FOODSENSE_CSV = RUTA_FOODSENSE / "etiquetas.csv"
+
 # Food-101 NO se guarda dentro del proyecto: torchvision lo descarga a su
 # propia carpeta de caché (fuera del repo). Pesa ~5 GB comprimido / ~10 GB
 # ya extraído.
@@ -37,6 +43,8 @@ RUTA_HISTORICO_CSV = RUTA_SALIDAS / "historico_entrenamiento.csv"
 RUTA_METRICAS_CSV = RUTA_SALIDAS / "resultados_comida.csv"
 RUTA_METRICAS_POR_ETIQUETA_CSV = RUTA_SALIDAS / "metricas_por_etiqueta.csv"
 RUTA_MATRICES_CONFUSION = RUTA_SALIDAS / "matrices_confusion.png"
+RUTA_UMBRALES_JSON = RUTA_SALIDAS / "umbrales_por_sabor.json"
+RUTA_BALANCE_JSON = RUTA_SALIDAS / "balance_entrenamiento.json"
 
 # =========================================================
 # ETIQUETAS: los 5 sabores (multi-etiqueta, no son mutuamente excluyentes)

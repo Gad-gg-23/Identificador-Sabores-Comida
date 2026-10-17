@@ -1,7 +1,8 @@
 """
 Punto de entrada único del identificador de sabores de comida.
 
-    python Comida.py datos        -> descarga/verifica Food-101
+    python Comida.py datos        -> prepara y verifica los tres datasets
+    python Comida.py foodsense    -> regenera el complemento humano FoodSense
     python Comida.py entrenar     -> entrena y guarda el modelo
     python Comida.py predecir --imagen ruta.jpg
     python Comida.py predecir --carpeta ruta/
@@ -25,6 +26,12 @@ def comando_entrenar():
     entrenar.entrenar()
 
 
+def comando_foodsense():
+    import foodsense
+
+    foodsense.preparar()
+
+
 def comando_predecir(args_restantes):
     import predecir
 
@@ -35,8 +42,9 @@ def comando_predecir(args_restantes):
 def main():
     parser = argparse.ArgumentParser(description="Identificador multi-etiqueta de sabores de comida.")
     subparsers = parser.add_subparsers(dest="comando", required=True)
-    subparsers.add_parser("datos", help="Descarga y verifica Food-101.")
+    subparsers.add_parser("datos", help="Prepara y verifica los tres datasets.")
     subparsers.add_parser("entrenar", help="Entrena el modelo.")
+    subparsers.add_parser("foodsense", help="Regenera y descarga el complemento humano FoodSense.")
     subparsers.add_parser("predecir", help="Predice sobre una imagen o carpeta.")
 
     args, restantes = parser.parse_known_args()
@@ -45,6 +53,8 @@ def main():
         comando_datos()
     elif args.comando == "entrenar":
         comando_entrenar()
+    elif args.comando == "foodsense":
+        comando_foodsense()
     elif args.comando == "predecir":
         comando_predecir(restantes)
 

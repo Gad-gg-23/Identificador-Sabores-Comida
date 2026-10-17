@@ -39,10 +39,10 @@ Lo que vas a ver pasar, en orden:
 1. **Clona el repo** — rápido, segundos.
 2. **Verifica la GPU** — debe imprimir `GPU disponible: True`. Si dice `False`, te faltó el paso 1.2.
 3. **Fotos desde Drive** — déjala tal cual (`USAR_DRIVE = False`), no la necesitas.
-4. **Descarga Food-101 y entrena** — tiene DOS celdas:
-   - La primera descarga Food-101 (**pesa ~5 GB — la primera vez tarda varios minutos**, vas a ver progreso). Las siguientes veces es más rápido porque ya queda en caché mientras la sesión siga abierta.
+4. **Descarga Food-101, prepara FoodSense y entrena** — tiene DOS celdas:
+   - La primera descarga Food-101 (**pesa ~5 GB — la primera vez tarda varios minutos**) y verifica el complemento FoodSense curado. Las siguientes veces es más rápido porque queda en caché mientras la sesión siga abierta.
    - La segunda es la que **entrena de verdad**: va a imprimir el progreso época por época. Tarda varios minutos más (son ~100,000 imágenes). **Espera a que termine por completo** — al final debe decir `Modelo final en '.../salidas/modelo_comida.pt'`. Si avanzas a la siguiente celda antes de que termine, te va a salir un error de "archivo no encontrado".
-5. **Ver resultados** — te muestra Accuracy exacta, F1 por ejemplo, F1 por sabor, la tabla de métricas por sabor, y las 5 matrices de confusión (una por sabor).
+5. **Ver resultados** — te muestra Accuracy exacta, F1 por ejemplo, F1 por sabor, la tabla de métricas por sabor y las 5 matrices de confusión. El entrenamiento balancea automáticamente cada sabor y calibra cinco umbrales usando solo validación.
 6. **Descargar o subir el modelo** (opcional) — ver Parte 4.
 7. **Probar con tu propia foto** (opcional) — ver Parte 5.
 
@@ -52,7 +52,7 @@ Lo que vas a ver pasar, en orden:
 
 Esto se hace desde el navegador, directo en GitHub — no toques Colab para este paso. **Cada foto necesita que alguien diga explícitamente qué sabores tiene** (no basta con solo subirla a una carpeta), porque el sabor no se puede adivinar solo del nombre del platillo.
 
-**Antes de inventar los sabores a ojo, revisa [`comidas_platillos.csv`](comidas_platillos.csv)** (en la raíz del repo) — es la tabla oficial del equipo con los sabores ya decididos para ~280 platillos. Si tu platillo ya está ahí, copia esos mismos valores para que todos usemos el mismo criterio (así el modelo no recibe etiquetas contradictorias para el mismo platillo). Solo si tu platillo NO aparece en esa tabla, decide el sabor tú mismo con buen criterio (o pregúntale a quien lo preparó).
+**Antes de inventar los sabores a ojo, revisa [`comidas_platillos.csv`](comidas_platillos.csv)** (en la raíz del repo) — es la tabla oficial del equipo con los sabores ya decididos para ~300 platillos. Si tu platillo ya está ahí, copia esos mismos valores para que todos usemos el mismo criterio (así el modelo no recibe etiquetas contradictorias para el mismo platillo). Solo si tu platillo NO aparece en esa tabla, decide el sabor tú mismo con buen criterio (o pregúntale a quien lo preparó).
 
 1. Entra al repo en GitHub, navega a `data/fotos_propias/imagenes/`.
 2. Botón **Add file → Upload files** → arrastra tus fotos (jpg o png) → **Commit changes**.
@@ -89,13 +89,17 @@ Pasos:
 5. Al entrenar, el modelo ya las va a incluir.
 6. Revisa la celda de resultados para ver si las métricas cambiaron.
 
+FoodSense se incorpora automáticamente; no hay que copiar sus imágenes al
+repositorio. Su manifiesto conserva la licencia CC BY 4.0, el consenso de los
+anotadores y los splits originales por imagen.
+
 ---
 
 ## Parte 4 — Compartir el modelo entrenado con el equipo (opcional)
 
 Al final del notebook hay dos formas de quedarte con el modelo que acabas de entrenar:
 
-**Opción A — descargarlo a tu computadora:** corre esa celda y Colab te lo baja directo (`modelo_comida.pt`).
+**Opción A — descargarlo a tu computadora:** corre esa celda y Colab descarga `modelo_comida.pt` y `umbrales_por_sabor.json`. Conserva ambos juntos: el JSON contiene la calibración de cada sabor.
 
 **Opción B — subirlo de vuelta al repo** (para que todo el equipo tenga el último modelo entrenado): esa celda te va a pedir:
 - Tu **usuario de GitHub**.

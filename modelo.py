@@ -16,15 +16,18 @@ from torchvision.models import MobileNet_V2_Weights, mobilenet_v2
 import config
 
 
-def crear_modelo(afinar_completo: bool = False) -> nn.Module:
+def crear_modelo(afinar_completo: bool = False, preentrenado: bool = True) -> nn.Module:
     """
     afinar_completo=False (por defecto): solo se entrena la cabeza nueva,
         el resto de la red queda congelada (rápido, pocos datos necesarios).
     afinar_completo=True: además se descongelan las últimas capas
         convolucionales para un ajuste más fino (más lento, usar solo si
         ya hay bastantes fotos propias acumuladas).
+    preentrenado=False: construye la arquitectura sin descargar ImageNet;
+        se usa al cargar un checkpoint local que ya contiene todos los pesos.
     """
-    modelo = mobilenet_v2(weights=MobileNet_V2_Weights.IMAGENET1K_V2)
+    pesos = MobileNet_V2_Weights.IMAGENET1K_V2 if preentrenado else None
+    modelo = mobilenet_v2(weights=pesos)
 
     for parametro in modelo.parameters():
         parametro.requires_grad = False
