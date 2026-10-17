@@ -38,6 +38,12 @@ por `torchvision` — **no necesita cuenta de Kaggle**), y cada categoría
 antes de entrenar en serio, es la decisión que más va a afectar qué tan
 bien funciona el modelo al final.
 
+Para las **fotos propias del equipo** (`data/fotos_propias/`), en cambio,
+el sabor no se infiere de ningún nombre de categoría: se etiqueta a mano
+siguiendo [`comidas_platillos.csv`](comidas_platillos.csv), la tabla
+oficial del equipo (~280 platillos) — ver la Parte 2 de
+[GUIA_EQUIPO.md](GUIA_EQUIPO.md).
+
 ## Cómo se "aplasta el ruido con datos"
 
 Dos fuentes de ruido, dos estrategias:

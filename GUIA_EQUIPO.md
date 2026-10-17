@@ -52,6 +52,8 @@ Lo que vas a ver pasar, en orden:
 
 Esto se hace desde el navegador, directo en GitHub — no toques Colab para este paso. **Cada foto necesita que alguien diga explícitamente qué sabores tiene** (no basta con solo subirla a una carpeta), porque el sabor no se puede adivinar solo del nombre del platillo.
 
+**Antes de inventar los sabores a ojo, revisa [`comidas_platillos.csv`](comidas_platillos.csv)** (en la raíz del repo) — es la tabla oficial del equipo con los sabores ya decididos para ~280 platillos. Si tu platillo ya está ahí, copia esos mismos valores para que todos usemos el mismo criterio (así el modelo no recibe etiquetas contradictorias para el mismo platillo). Solo si tu platillo NO aparece en esa tabla, decide el sabor tú mismo con buen criterio (o pregúntale a quien lo preparó).
+
 1. Entra al repo en GitHub, navega a `data/fotos_propias/imagenes/`.
 2. Botón **Add file → Upload files** → arrastra tus fotos (jpg o png) → **Commit changes**.
 3. Ahora ve a `data/fotos_propias/etiquetas.csv` → ícono de **lápiz (Edit)** → agrega una línea por cada foto que subiste, con este formato:
