@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 import torch
-from PIL import Image
+from PIL import Image, ImageOps
 
 import balanceo
 import config
@@ -49,8 +49,18 @@ def predecir_imagen(
     ruta_imagen: Path,
     umbrales: dict[str, float] | None = None,
 ) -> dict:
+    ruta_imagen = Path(ruta_imagen)
+    if not ruta_imagen.is_file():
+        raise FileNotFoundError(f"No se encontró la imagen '{ruta_imagen}'.")
+    if ruta_imagen.suffix.lower() not in EXTENSIONES_VALIDAS:
+        raise ValueError(
+            f"Formato no compatible: '{ruta_imagen.suffix}'. "
+            "Usa JPG, JPEG, PNG, BMP o WEBP."
+        )
     transform = dataset.transform_evaluacion()
-    imagen = Image.open(ruta_imagen).convert("RGB")
+    with Image.open(ruta_imagen) as archivo_imagen:
+        # Respeta la orientación EXIF de fotografías tomadas con celular.
+        imagen = ImageOps.exif_transpose(archivo_imagen).convert("RGB")
     tensor = transform(imagen).unsqueeze(0).to(config.DISPOSITIVO)
 
     with torch.no_grad():

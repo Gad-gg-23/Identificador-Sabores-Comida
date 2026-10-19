@@ -74,13 +74,35 @@ calibra un umbral por sabor en validación. Así se mejora el aprendizaje de
 ## Uso local
 
 ```bash
-pip install -r requirements.txt
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
 python Comida.py datos       # prepara los tres datasets; Food-101 pesa ~5 GB
 python Comida.py foodsense   # regenera el complemento humano (normalmente no hace falta)
 python Comida.py entrenar    # entrena y guarda el modelo
+python Comida.py interfaz    # abre la interfaz gráfica para elegir y analizar una foto
 python Comida.py predecir --imagen ruta/foto.jpg
 python auditar_datos.py --dataset todos
 ```
+
+## Interfaz gráfica
+
+Después de instalar las dependencias y tener `salidas/modelo_comida.pt`, abre
+la aplicación con:
+
+```bash
+python Comida.py interfaz
+```
+
+La ventana permite elegir una imagen JPG, PNG, BMP o WEBP, comprobar que sea
+válida, verla antes de procesarla y ejecutar la misma inferencia de
+`predecir.py`. El resultado muestra los sabores detectados, la probabilidad de
+cada uno y su umbral de decisión. El modelo se carga una sola vez en segundo
+plano para que la ventana no se congele.
+
+En algunas distribuciones mínimas de Linux, Tk no viene incluido con Python y
+se instala mediante el paquete del sistema `python3-tk`. En macOS y Windows
+normalmente ya forma parte de la instalación estándar de Python.
 
 Entrenar localmente sin GPU es lento — lo normal es entrenar en Colab (ver
 [GUIA_EQUIPO.md](GUIA_EQUIPO.md)) y opcionalmente descargar o traer de
@@ -95,6 +117,7 @@ dataset.py          Combina Food-101, fotos propias y FoodSense; augmentation
 modelo.py           Transfer learning MobileNetV2, cabeza de 5 salidas
 entrenar.py         Entrenamiento + métricas + matrices de confusión
 predecir.py         Predicción sobre una imagen o carpeta
+interfaz.py          Aplicación gráfica para seleccionar y analizar una imagen
 data/fotos_propias/ Fotos del equipo + etiquetas.csv (sabores a mano)
 data/foodsense_curado/ Manifiesto humano compatible; imágenes bajo demanda
 foodsense.py         Curación, consenso, balance y descarga reproducible

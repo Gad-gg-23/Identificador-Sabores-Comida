@@ -9,6 +9,18 @@ import predecir
 
 
 class UmbralesPrediccionTest(unittest.TestCase):
+    def test_rechaza_una_ruta_inexistente_antes_de_ejecutar_el_modelo(self):
+        with self.assertRaisesRegex(FileNotFoundError, "No se encontró"):
+            predecir.predecir_imagen(object(), Path("imagen_que_no_existe.jpg"))
+
+    def test_rechaza_una_extension_no_compatible(self):
+        with tempfile.TemporaryDirectory() as temporal:
+            ruta = Path(temporal) / "platillo.txt"
+            ruta.write_text("no es una imagen", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "Formato no compatible"):
+                predecir.predecir_imagen(object(), ruta)
+
     def test_modelos_anteriores_conservan_umbral_predeterminado(self):
         with tempfile.TemporaryDirectory() as temporal:
             ruta = Path(temporal) / "inexistente.json"
