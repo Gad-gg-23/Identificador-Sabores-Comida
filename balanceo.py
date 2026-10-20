@@ -87,6 +87,20 @@ def optimizar_umbrales(
     return resultado
 
 
+def aplicar_umbrales(probabilidades: np.ndarray, umbrales: np.ndarray) -> np.ndarray:
+    """Probabilidades (n, etiquetas) -> predicción 0/1 con la misma regla que la app.
+
+    Todo platillo tiene al menos un sabor: si en una foto ninguna probabilidad
+    cruza su umbral, se marca el sabor más probable. Se usa igual al evaluar y
+    al predecir para que las métricas midan lo que de verdad hace la interfaz.
+    """
+    probabilidades = np.atleast_2d(np.asarray(probabilidades, dtype=np.float64))
+    prediccion = (probabilidades >= np.asarray(umbrales)).astype(int)
+    vacias = ~prediccion.any(axis=1)
+    prediccion[vacias, probabilidades[vacias].argmax(axis=1)] = 1
+    return prediccion
+
+
 def vector_umbrales(
     umbrales: dict[str, float] | None,
     etiquetas: Sequence[str],

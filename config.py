@@ -201,7 +201,13 @@ def etiquetas_multihot(nombre_clase: str) -> list[int]:
 TAMANO_IMAGEN = 224          # tamaño de entrada esperado por MobileNetV2
 BATCH_SIZE = 32
 NUM_EPOCAS = 15
-TASA_APRENDIZAJE = 1e-3
+TASA_APRENDIZAJE = 1e-3       # cabeza nueva (5 salidas)
+# Con solo la cabeza entrenable (6,405 parámetros) el modelo se quedaba corto:
+# la pérdida de train no bajaba de 0.42. Se descongelan las últimas capas del
+# backbone (~1.2 M parámetros) con una tasa 10 veces menor para ajustarlas sin
+# borrar lo que traen de ImageNet.
+AFINAR_COMPLETO = True
+TASA_APRENDIZAJE_BACKBONE = 1e-4
 PACIENCIA_EARLY_STOPPING = 4  # épocas sin mejorar F1 de validación antes de parar
 RANDOM_STATE = 42
 UMBRAL_DECISION = 0.5         # probabilidad mínima para marcar un sabor como presente

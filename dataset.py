@@ -23,7 +23,7 @@ import csv
 import random
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageOps
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -234,9 +234,14 @@ def transform_entrenamiento() -> transforms.Compose:
 
 
 def transform_evaluacion() -> transforms.Compose:
-    """Sin augmentation: solo redimensionar y normalizar (val/test/predicción)."""
+    """
+    Sin augmentation (val/test/predicción). Escala el lado corto y recorta el
+    centro, igual que el preentrenamiento de ImageNet y que RandomResizedCrop
+    en train: así no se estiran las fotos que no son cuadradas.
+    """
     return transforms.Compose([
-        transforms.Resize((config.TAMANO_IMAGEN, config.TAMANO_IMAGEN)),
+        transforms.Resize(round(config.TAMANO_IMAGEN * 256 / 224)),
+        transforms.CenterCrop(config.TAMANO_IMAGEN),
         transforms.ToTensor(),
         transforms.Normalize(_MEDIA_IMAGENET, _STD_IMAGENET),
     ])
@@ -245,6 +250,13 @@ def transform_evaluacion() -> transforms.Compose:
 # =========================================================
 # DATASET DE PYTORCH
 # =========================================================
+
+def cargar_imagen(ruta: Path) -> Image.Image:
+    """Abre una imagen en RGB respetando la orientación EXIF (fotos de celular).
+    Se usa igual en entrenamiento y en predicción."""
+    with Image.open(ruta) as archivo:
+        return ImageOps.exif_transpose(archivo).convert("RGB")
+
 
 class ImagenesComida(Dataset):
     """Envuelve una lista de (ruta_imagen, vector_multihot) para PyTorch."""
@@ -260,7 +272,6 @@ class ImagenesComida(Dataset):
         import torch
 
         ruta, vector = self.items[idx]
-        imagen = Image.open(ruta).convert("RGB")
-        imagen = self.transform(imagen)
+        imagen = self.transform(cargar_imagen(ruta))
         etiquetas = torch.tensor(vector, dtype=torch.float32)  # BCEWithLogitsLoss pide float
         return imagen, etiquetas

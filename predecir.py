@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 
 import torch
-from PIL import Image, ImageOps
 
 import balanceo
 import config
@@ -58,26 +57,24 @@ def predecir_imagen(
             "Usa JPG, JPEG, PNG, BMP o WEBP."
         )
     transform = dataset.transform_evaluacion()
-    with Image.open(ruta_imagen) as archivo_imagen:
-        # Respeta la orientación EXIF de fotografías tomadas con celular.
-        imagen = ImageOps.exif_transpose(archivo_imagen).convert("RGB")
+    imagen = dataset.cargar_imagen(ruta_imagen)
     tensor = transform(imagen).unsqueeze(0).to(config.DISPOSITIVO)
 
     with torch.no_grad():
         salida = modelo(tensor)
-        probabilidades = torch.sigmoid(salida).squeeze(0)
+        probabilidades = torch.sigmoid(salida).squeeze(0).cpu().numpy()
 
     probs_por_etiqueta = {
         etiqueta: float(probabilidades[i]) for i, etiqueta in enumerate(config.ETIQUETAS)
     }
     umbrales = umbrales or cargar_umbrales()
+    # Misma regla que en la evaluación (al menos un sabor por platillo).
+    prediccion = balanceo.aplicar_umbrales(
+        probabilidades, [umbrales[etiqueta] for etiqueta in config.ETIQUETAS]
+    )[0]
     etiquetas_predichas = [
-        etiqueta for etiqueta, prob in probs_por_etiqueta.items() if prob >= umbrales[etiqueta]
+        etiqueta for etiqueta, marcado in zip(config.ETIQUETAS, prediccion) if marcado
     ]
-    if not etiquetas_predichas:
-        # Todo plato tiene algún sabor dominante: si ninguno cruza el umbral,
-        # se regresa al menos el más probable en vez de dejar la lista vacía.
-        etiquetas_predichas = [max(probs_por_etiqueta, key=probs_por_etiqueta.get)]
 
     return {
         "archivo": ruta_imagen.name,
