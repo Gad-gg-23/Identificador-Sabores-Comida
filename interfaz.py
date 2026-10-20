@@ -161,6 +161,28 @@ class AplicacionSabores:
 
         self._construir_panel_imagen(contenedor)
         self._construir_panel_resultados(contenedor)
+        self._construir_barra_estado(contenedor)
+
+    def _construir_barra_estado(self, padre: tk.Frame) -> None:
+        barra = tk.Frame(padre, bg=FONDO)
+        barra.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(16, 0))
+        self.indicador_estado = tk.Label(
+            barra,
+            text="●",
+            bg=FONDO,
+            fg=TEXTO_SUAVE,
+            font=("Helvetica", 10),
+        )
+        self.indicador_estado.pack(side="left")
+        self.etiqueta_estado = tk.Label(
+            barra,
+            text="Cargando el modelo…",
+            bg=FONDO,
+            fg=TEXTO_SUAVE,
+            font=("Helvetica", 10),
+            anchor="w",
+        )
+        self.etiqueta_estado.pack(side="left", padx=(6, 0))
 
     def _crear_tarjeta(self, padre: tk.Widget) -> tk.Frame:
         return tk.Frame(
@@ -318,7 +340,7 @@ class AplicacionSabores:
 
     def _iniciar_carga_modelo(self) -> None:
         self.modelo_listo = False
-        # self._actualizar_estado("Cargando el modelo…", "#C49135")
+        self._actualizar_estado("Cargando el modelo…", "#C49135")
         threading.Thread(target=self._cargar_modelo, daemon=True).start()
 
     def _cargar_modelo(self) -> None:
@@ -392,6 +414,7 @@ class AplicacionSabores:
                     self.modulo_prediccion, self.modelo, self.umbrales = datos
                     self.modelo_listo = True
                     self._actualizar_boton_analizar()
+                    self._actualizar_estado("Modelo listo", VERDE)
                 elif tipo == "error_modelo":
                     self.modelo_listo = False
                     self._actualizar_estado("No fue posible cargar el modelo", ROJO)
