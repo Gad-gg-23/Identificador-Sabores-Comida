@@ -215,10 +215,12 @@ UMBRAL_DECISION = 0.5         # probabilidad mínima para marcar un sabor como p
 # Food-101 solo trae train/test oficiales; el val se separa del train.
 FRACCION_VALIDACION = 0.1
 
-# Fracción de las fotos propias que se reserva como prueba "de ruido real"
-# (el resto se mezcla al entrenamiento). NO se estratifica (cada foto
-# puede tener varios sabores a la vez, estratificar multi-etiqueta
-# necesitaría una librería aparte) — se reparte aleatoriamente nomás.
+# Reparto de las fotos propias: 65 % train / 15 % val / 20 % test "de ruido
+# real". Se reparte por PLATILLO completo (todas las fotos de un platillo van
+# al mismo split, ver dataset.repartir_por_platillo) para que el test no
+# tenga fotos casi iguales a las de train. Las fracciones son aproximadas
+# porque cada platillo tiene distinto número de fotos.
+FRACCION_VAL_FOTOS_PROPIAS = 0.15
 FRACCION_PRUEBA_FOTOS_PROPIAS = 0.2
 
 DISPOSITIVO = torch.device("cuda" if torch.cuda.is_available() else "cpu")

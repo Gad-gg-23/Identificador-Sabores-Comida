@@ -63,6 +63,15 @@ def _crear_dataloaders():
     return dl_train, dl_val, dl_test, pos_weight, reporte_balance
 
 
+def _fuente(ruta) -> str:
+    """De qué dataset viene una imagen, según la carpeta donde vive."""
+    if config.RUTA_IMAGENES_PROPIAS in ruta.parents:
+        return "Fotos propias"
+    if config.RUTA_IMAGENES_FOODSENSE in ruta.parents:
+        return "FoodSense"
+    return "Food-101"
+
+
 def _correr_epoca(modelo, dataloader, criterio, optimizador=None, umbrales=None):
     """Una pasada completa. Si optimizador es None, es modo evaluación (sin backprop)."""
     entrenando = optimizador is not None
@@ -224,17 +233,28 @@ def entrenar():
         modelo, dl_test, criterio, umbrales=umbrales
     )
 
-    resultados = {
-        "Accuracy_exacta": metricas_test["accuracy_exacta"],
-        "F1_muestras": metricas_test["f1_muestras"],
-        "F1_macro": metricas_test["f1_macro"],
-    }
+    # Una fila por fuente de test (el orden de y_true es el de ds_test.items,
+    # porque dl_test no baraja) y otra con el total. La que más importa es la
+    # de fotos propias: platillos reales, con ruido, que el modelo nunca vio.
+    fuentes = np.array([_fuente(ruta) for ruta, _ in dl_test.dataset.items])
+    filas = []
+    for conjunto in ("Fotos propias", "Food-101", "FoodSense", "Total"):
+        mascara = np.ones(len(fuentes), bool) if conjunto == "Total" else fuentes == conjunto
+        if not mascara.any():
+            continue
+        filas.append({
+            "Conjunto": conjunto,
+            "Imagenes": int(mascara.sum()),
+            "Accuracy_exacta": accuracy_score(y_true[mascara], y_pred[mascara]),
+            "F1_muestras": f1_score(y_true[mascara], y_pred[mascara], average="samples", zero_division=0),
+            "F1_macro": f1_score(y_true[mascara], y_pred[mascara], average="macro", zero_division=0),
+        })
+    resultados = pd.DataFrame(filas)
 
     print("\n=== Resultados en test ===")
-    for nombre, valor in resultados.items():
-        print(f"{nombre}: {valor:.4f}")
+    print(resultados.to_string(index=False, float_format="{:.4f}".format))
 
-    pd.DataFrame([resultados]).to_csv(config.RUTA_METRICAS_CSV, index=False)
+    resultados.to_csv(config.RUTA_METRICAS_CSV, index=False)
     print(f"\nMétricas guardadas en '{config.RUTA_METRICAS_CSV}'")
 
     # --- Métricas por sabor (precision/recall/f1/support) ---

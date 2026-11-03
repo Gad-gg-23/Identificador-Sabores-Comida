@@ -71,6 +71,21 @@ con la fórmula `negativos / positivos`, usando únicamente `train`. Después
 calibra un umbral por sabor en validación. Así se mejora el aprendizaje de
 `amarga` sin duplicar archivos ni usar información del conjunto de prueba.
 
+## Splits sin fugas
+
+- **Fotos propias por platillo**: se reparten ~65 % train / 15 % val / 20 % test
+  por *platillo completo* (todas las fotos de `pozole*.jpg` caen en el mismo
+  split). Si se repartieran foto por foto, el test tendría fotos casi iguales
+  a las de train y la métrica saldría inflada; así el test mide platillos que
+  el modelo nunca vio. Con los datos actuales: 208 / 49 / 65 platillos.
+- **Duplicados fuera**: se buscaron fotos repetidas por hash (exactas y casi
+  iguales). Las copias se sacaron del dataset a `descargas_descartadas/`.
+- **Food-101 y FoodSense** conservan sus splits oficiales (el val de Food-101
+  sale de su train).
+- **Métricas por fuente**: `salidas/resultados_comida.csv` trae una fila para
+  cada conjunto de test (fotos propias, Food-101, FoodSense) y el total. La que
+  más importa es la de fotos propias.
+
 ## Uso local
 
 ```bash
