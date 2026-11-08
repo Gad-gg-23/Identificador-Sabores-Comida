@@ -201,7 +201,13 @@ def etiquetas_multihot(nombre_clase: str) -> list[int]:
 TAMANO_IMAGEN = 224          # tamaño de entrada esperado por MobileNetV2
 BATCH_SIZE = 32
 NUM_EPOCAS = 15
-TASA_APRENDIZAJE = 1e-3
+TASA_APRENDIZAJE = 1e-3       # cabeza nueva (5 salidas)
+# Con solo la cabeza entrenable (6,405 parámetros) el modelo se quedaba corto:
+# la pérdida de train no bajaba de 0.42. Se descongelan las últimas capas del
+# backbone (~1.2 M parámetros) con una tasa 10 veces menor para ajustarlas sin
+# borrar lo que traen de ImageNet.
+AFINAR_COMPLETO = True
+TASA_APRENDIZAJE_BACKBONE = 1e-4
 PACIENCIA_EARLY_STOPPING = 4  # épocas sin mejorar F1 de validación antes de parar
 RANDOM_STATE = 42
 UMBRAL_DECISION = 0.5         # probabilidad mínima para marcar un sabor como presente
@@ -209,10 +215,12 @@ UMBRAL_DECISION = 0.5         # probabilidad mínima para marcar un sabor como p
 # Food-101 solo trae train/test oficiales; el val se separa del train.
 FRACCION_VALIDACION = 0.1
 
-# Fracción de las fotos propias que se reserva como prueba "de ruido real"
-# (el resto se mezcla al entrenamiento). NO se estratifica (cada foto
-# puede tener varios sabores a la vez, estratificar multi-etiqueta
-# necesitaría una librería aparte) — se reparte aleatoriamente nomás.
+# Reparto de las fotos propias: 65 % train / 15 % val / 20 % test "de ruido
+# real". Se reparte por PLATILLO completo (todas las fotos de un platillo van
+# al mismo split, ver dataset.repartir_por_platillo) para que el test no
+# tenga fotos casi iguales a las de train. Las fracciones son aproximadas
+# porque cada platillo tiene distinto número de fotos.
+FRACCION_VAL_FOTOS_PROPIAS = 0.15
 FRACCION_PRUEBA_FOTOS_PROPIAS = 0.2
 
 DISPOSITIVO = torch.device("cuda" if torch.cuda.is_available() else "cpu")

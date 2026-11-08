@@ -21,10 +21,11 @@ test, listas para envolver en ImagenesComida (Dataset de PyTorch).
 
 import csv
 import random
+import re
 from pathlib import Path
 
-from PIL import Image
-from sklearn.model_selection import train_test_split
+from PIL import Image, ImageOps
+from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from torch.utils.data import Dataset
 from torchvision import transforms
 
@@ -128,6 +129,41 @@ def indexar_foodsense_curado() -> dict[str, list[tuple[Path, list[int]]]]:
     return splits
 
 
+def platillo_de_archivo(ruta: Path) -> str:
+    """'Mole_Negro12.jpg' -> 'mole_negro'. Las fotos propias se nombran
+    <platillo><número>, así que quitando el número queda el platillo."""
+    return re.sub(r"[_\-\s]*\d+$", "", ruta.stem).lower()
+
+
+def repartir_por_platillo(
+    fotos: list[tuple[Path, list[int]]], fraccion_val: float, fraccion_test: float,
+) -> tuple[list, list, list]:
+    """
+    Reparte las fotos propias en train/val/test por PLATILLO completo: todas
+    las fotos de un platillo caen en el mismo split. Si se repartieran foto
+    por foto, el test tendría fotos casi iguales (mismo platillo, mismo plato
+    o mismo fondo) a las de train y la métrica saldría inflada; así el test
+    mide platillos que el modelo nunca vio.
+    """
+    grupos = [platillo_de_archivo(ruta) for ruta, _ in fotos]
+    resto_idx, test_idx = next(GroupShuffleSplit(
+        n_splits=1, test_size=fraccion_test, random_state=config.RANDOM_STATE,
+    ).split(fotos, groups=grupos))
+
+    resto = [fotos[i] for i in resto_idx]
+    grupos_resto = [grupos[i] for i in resto_idx]
+    train_idx, val_idx = next(GroupShuffleSplit(
+        n_splits=1, test_size=fraccion_val / (1 - fraccion_test),
+        random_state=config.RANDOM_STATE,
+    ).split(resto, groups=grupos_resto))
+
+    return (
+        [resto[i] for i in train_idx],
+        [resto[i] for i in val_idx],
+        [fotos[i] for i in test_idx],
+    )
+
+
 def _listar_imagenes(carpeta: Path) -> list[Path]:
     if not carpeta.exists():
         return []
@@ -146,8 +182,10 @@ def construir_splits() -> dict[str, list[tuple[Path, list[int]]]]:
       por NOMBRE DE PLATILLO (no por sabor: con multi-etiqueta no hay una
       sola clase para estratificar).
     - Las fotos propias (ruido real del equipo, etiquetadas a mano) se
-      reparten aparte y sin estratificar. El holdout contiene fotos nuevas de
-      platillos que también pueden aparecer en train; no mide platillos inéditos.
+      reparten aparte en train/val/test POR PLATILLO (repartir_por_platillo):
+      ningún platillo aparece en dos splits, así que su test mide platillos
+      inéditos. Tener fotos propias en val hace que el early stopping y los
+      umbrales se ajusten también al ruido real, no solo a Food-101.
     - FoodSense conserva su train/validation/test oficial a nivel de imagen.
     """
     print("Descargando/verificando Food-101 (train)...")
@@ -171,15 +209,18 @@ def construir_splits() -> dict[str, list[tuple[Path, list[int]]]]:
 
     fotos_propias = indexar_fotos_propias()
     if fotos_propias:
-        train_fp, test_fp = train_test_split(
+        train_fp, val_fp, test_fp = repartir_por_platillo(
             fotos_propias,
-            test_size=config.FRACCION_PRUEBA_FOTOS_PROPIAS,
-            random_state=config.RANDOM_STATE,
+            config.FRACCION_VAL_FOTOS_PROPIAS,
+            config.FRACCION_PRUEBA_FOTOS_PROPIAS,
         )
         splits["train"].extend(train_fp)
+        splits["val"].extend(val_fp)
         splits["test"].extend(test_fp)
-        print(f"Fotos propias encontradas: {len(fotos_propias)} "
-              f"({len(train_fp)} a train, {len(test_fp)} a test).")
+        num_platillos = len({platillo_de_archivo(ruta) for ruta, _ in fotos_propias})
+        print(f"Fotos propias encontradas: {len(fotos_propias)} de {num_platillos} platillos "
+              f"({len(train_fp)} a train, {len(val_fp)} a val, {len(test_fp)} a test; "
+              "repartidas por platillo).")
     else:
         print("Aviso: no hay fotos propias etiquetadas en data/fotos_propias/ todavía. "
               "Se usarán Food-101 y FoodSense, pero faltará el ruido real y la cobertura "
@@ -234,9 +275,14 @@ def transform_entrenamiento() -> transforms.Compose:
 
 
 def transform_evaluacion() -> transforms.Compose:
-    """Sin augmentation: solo redimensionar y normalizar (val/test/predicción)."""
+    """
+    Sin augmentation (val/test/predicción). Escala el lado corto y recorta el
+    centro, igual que el preentrenamiento de ImageNet y que RandomResizedCrop
+    en train: así no se estiran las fotos que no son cuadradas.
+    """
     return transforms.Compose([
-        transforms.Resize((config.TAMANO_IMAGEN, config.TAMANO_IMAGEN)),
+        transforms.Resize(round(config.TAMANO_IMAGEN * 256 / 224)),
+        transforms.CenterCrop(config.TAMANO_IMAGEN),
         transforms.ToTensor(),
         transforms.Normalize(_MEDIA_IMAGENET, _STD_IMAGENET),
     ])
@@ -245,6 +291,13 @@ def transform_evaluacion() -> transforms.Compose:
 # =========================================================
 # DATASET DE PYTORCH
 # =========================================================
+
+def cargar_imagen(ruta: Path) -> Image.Image:
+    """Abre una imagen en RGB respetando la orientación EXIF (fotos de celular).
+    Se usa igual en entrenamiento y en predicción."""
+    with Image.open(ruta) as archivo:
+        return ImageOps.exif_transpose(archivo).convert("RGB")
+
 
 class ImagenesComida(Dataset):
     """Envuelve una lista de (ruta_imagen, vector_multihot) para PyTorch."""
@@ -260,7 +313,6 @@ class ImagenesComida(Dataset):
         import torch
 
         ruta, vector = self.items[idx]
-        imagen = Image.open(ruta).convert("RGB")
-        imagen = self.transform(imagen)
+        imagen = self.transform(cargar_imagen(ruta))
         etiquetas = torch.tensor(vector, dtype=torch.float32)  # BCEWithLogitsLoss pide float
         return imagen, etiquetas

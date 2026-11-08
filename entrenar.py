@@ -63,19 +63,28 @@ def _crear_dataloaders():
     return dl_train, dl_val, dl_test, pos_weight, reporte_balance
 
 
+def _fuente(ruta) -> str:
+    """De qué dataset viene una imagen, según la carpeta donde vive."""
+    if config.RUTA_IMAGENES_PROPIAS in ruta.parents:
+        return "Fotos propias"
+    if config.RUTA_IMAGENES_FOODSENSE in ruta.parents:
+        return "FoodSense"
+    return "Food-101"
+
+
 def _correr_epoca(modelo, dataloader, criterio, optimizador=None, umbrales=None):
     """Una pasada completa. Si optimizador es None, es modo evaluación (sin backprop)."""
     entrenando = optimizador is not None
-    modelo.train() if entrenando else modelo.eval()
+    if entrenando:
+        modelo_mod.modo_entrenamiento(modelo)
+    else:
+        modelo.eval()
 
     perdida_total = 0.0
-    y_true, y_pred, y_prob = [], [], []
+    y_true, y_prob = [], []
     vector_umbrales = balanceo.vector_umbrales(
         umbrales, config.ETIQUETAS, config.UMBRAL_DECISION
     )
-    tensor_umbrales = torch.tensor(
-        vector_umbrales, dtype=torch.float32, device=config.DISPOSITIVO
-    ).unsqueeze(0)
 
     contexto = torch.enable_grad() if entrenando else torch.no_grad()
     with contexto:
@@ -94,16 +103,13 @@ def _correr_epoca(modelo, dataloader, criterio, optimizador=None, umbrales=None)
                 optimizador.step()
 
             perdida_total += perdida.item() * imagenes.size(0)
-            probabilidades = torch.sigmoid(salidas)
-            predicciones = (probabilidades >= tensor_umbrales).int()
-            y_pred.extend(predicciones.cpu().tolist())
             y_true.extend(etiquetas.int().cpu().tolist())
-            y_prob.extend(probabilidades.cpu().tolist())
+            y_prob.extend(torch.sigmoid(salidas).cpu().tolist())
 
     n = len(y_true)
     y_true_arr = np.array(y_true)
-    y_pred_arr = np.array(y_pred)
     y_prob_arr = np.array(y_prob)
+    y_pred_arr = balanceo.aplicar_umbrales(y_prob_arr, vector_umbrales)
     metricas = {
         "perdida": perdida_total / n,
         # Accuracy "exacta": las 5 etiquetas deben coincidir perfectamente.
@@ -137,12 +143,12 @@ def entrenar():
         print(f"  {etiqueta}: {positivos} positivos, pos_weight={peso:.3f}")
 
     print(f"\nDispositivo: {config.DISPOSITIVO}")
-    modelo = modelo_mod.crear_modelo()
+    modelo = modelo_mod.crear_modelo(afinar_completo=config.AFINAR_COMPLETO)
+    entrenables = sum(p.numel() for p in modelo.parameters() if p.requires_grad)
+    print(f"Parámetros entrenables: {entrenables:,} "
+          f"(afinar_completo={config.AFINAR_COMPLETO})")
     criterio = nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(config.DISPOSITIVO))
-    optimizador = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, modelo.parameters()),
-        lr=config.TASA_APRENDIZAJE,
-    )
+    optimizador = torch.optim.Adam(modelo_mod.grupos_de_parametros(modelo))
 
     mejor_f1_val = -1.0
     epocas_sin_mejorar = 0
@@ -157,12 +163,10 @@ def entrenar():
         umbrales_epoca = balanceo.optimizar_umbrales(
             y_val, y_prob_val, config.ETIQUETAS
         )
-        pred_val_calibrada = (
-            y_prob_val
-            >= balanceo.vector_umbrales(
-                umbrales_epoca, config.ETIQUETAS, config.UMBRAL_DECISION
-            )
-        ).astype(int)
+        pred_val_calibrada = balanceo.aplicar_umbrales(
+            y_prob_val,
+            balanceo.vector_umbrales(umbrales_epoca, config.ETIQUETAS, config.UMBRAL_DECISION),
+        )
         metricas_val["accuracy_exacta"] = accuracy_score(y_val, pred_val_calibrada)
         metricas_val["f1_muestras"] = f1_score(
             y_val, pred_val_calibrada, average="samples", zero_division=0
@@ -229,17 +233,28 @@ def entrenar():
         modelo, dl_test, criterio, umbrales=umbrales
     )
 
-    resultados = {
-        "Accuracy_exacta": metricas_test["accuracy_exacta"],
-        "F1_muestras": metricas_test["f1_muestras"],
-        "F1_macro": metricas_test["f1_macro"],
-    }
+    # Una fila por fuente de test (el orden de y_true es el de ds_test.items,
+    # porque dl_test no baraja) y otra con el total. La que más importa es la
+    # de fotos propias: platillos reales, con ruido, que el modelo nunca vio.
+    fuentes = np.array([_fuente(ruta) for ruta, _ in dl_test.dataset.items])
+    filas = []
+    for conjunto in ("Fotos propias", "Food-101", "FoodSense", "Total"):
+        mascara = np.ones(len(fuentes), bool) if conjunto == "Total" else fuentes == conjunto
+        if not mascara.any():
+            continue
+        filas.append({
+            "Conjunto": conjunto,
+            "Imagenes": int(mascara.sum()),
+            "Accuracy_exacta": accuracy_score(y_true[mascara], y_pred[mascara]),
+            "F1_muestras": f1_score(y_true[mascara], y_pred[mascara], average="samples", zero_division=0),
+            "F1_macro": f1_score(y_true[mascara], y_pred[mascara], average="macro", zero_division=0),
+        })
+    resultados = pd.DataFrame(filas)
 
     print("\n=== Resultados en test ===")
-    for nombre, valor in resultados.items():
-        print(f"{nombre}: {valor:.4f}")
+    print(resultados.to_string(index=False, float_format="{:.4f}".format))
 
-    pd.DataFrame([resultados]).to_csv(config.RUTA_METRICAS_CSV, index=False)
+    resultados.to_csv(config.RUTA_METRICAS_CSV, index=False)
     print(f"\nMétricas guardadas en '{config.RUTA_METRICAS_CSV}'")
 
     # --- Métricas por sabor (precision/recall/f1/support) ---

@@ -1,8 +1,9 @@
 """
 Modelo: transfer learning con MobileNetV2 preentrenada en ImageNet.
 
-Se congela el backbone (las capas convolucionales que ya saben extraer
-bordes/texturas/formas) y solo se entrena una cabeza nueva. La cabeza
+Se congela casi todo el backbone (las capas convolucionales que ya saben
+extraer bordes/texturas/formas) y se entrena una cabeza nueva; con
+config.AFINAR_COMPLETO también se ajustan las últimas capas. La cabeza
 tiene 5 salidas (una por sabor) SIN softmax -- cada salida es independiente
 (sigmoid implícito en BCEWithLogitsLoss durante el entrenamiento, y
 explícito en predecir.py), porque un platillo puede ser dulce Y picoso Y
@@ -46,3 +47,36 @@ def crear_modelo(afinar_completo: bool = False, preentrenado: bool = True) -> nn
             parametro.requires_grad = True
 
     return modelo.to(config.DISPOSITIVO)
+
+
+def grupos_de_parametros(modelo: nn.Module) -> list[dict]:
+    """
+    Grupos para el optimizador: la cabeza nueva aprende con TASA_APRENDIZAJE y
+    las capas descongeladas del backbone con TASA_APRENDIZAJE_BACKBONE (menor),
+    para ajustarlas sin "olvidar" lo aprendido en ImageNet.
+    """
+    cabeza = [p for p in modelo.classifier.parameters() if p.requires_grad]
+    backbone = [p for p in modelo.features.parameters() if p.requires_grad]
+    grupos = [{"params": cabeza, "lr": config.TASA_APRENDIZAJE}]
+    if backbone:
+        grupos.append({"params": backbone, "lr": config.TASA_APRENDIZAJE_BACKBONE})
+    return grupos
+
+
+def modo_entrenamiento(modelo: nn.Module) -> None:
+    """
+    modelo.train() pero dejando en modo evaluación las BatchNorm congeladas.
+
+    requires_grad=False evita que el optimizador toque los pesos, pero en
+    modo train las BatchNorm siguen actualizando sus estadísticas
+    (running_mean / running_var) con cada lote. Con el augmentation agresivo
+    eso desvía las estadísticas de ImageNet que el backbone espera, y en
+    evaluación/predicción se usarían las desviadas. Las capas descongeladas
+    (afinar_completo=True) sí siguen actualizándose.
+    """
+    modelo.train()
+    for capa in modelo.modules():
+        if isinstance(capa, nn.modules.batchnorm._BatchNorm) and not any(
+            p.requires_grad for p in capa.parameters()
+        ):
+            capa.eval()
