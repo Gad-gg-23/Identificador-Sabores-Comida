@@ -1,0 +1,25 @@
+{
+  "imagenes_train": 72762,
+  "positivos": {
+    "acida": 24064,
+    "amarga": 3541,
+    "dulce": 24819,
+    "picosa": 15714,
+    "salada": 54813
+  },
+  "negativos": {
+    "acida": 48698,
+    "amarga": 69221,
+    "dulce": 47943,
+    "picosa": 57048,
+    "salada": 17949
+  },
+  "pos_weight": {
+    "acida": 2.023686835106383,
+    "amarga": 19.548432646145155,
+    "dulce": 1.9317055481687417,
+    "picosa": 3.630393279877816,
+    "salada": 0.3274588145148049
+  },
+  "formula": "negativos / positivos, calculada solo con train"
+}

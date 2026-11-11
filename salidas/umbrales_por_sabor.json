@@ -1,0 +1,11 @@
+{
+  "metodo": "umbral por sabor que maximiza F1 en validation",
+  "split_calibracion": "validation",
+  "umbrales": {
+    "acida": 0.545,
+    "amarga": 0.95,
+    "dulce": 0.605,
+    "picosa": 0.715,
+    "salada": 0.255
+  }
+}
